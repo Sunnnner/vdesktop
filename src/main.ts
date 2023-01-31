@@ -7,8 +7,7 @@ import 'vfonts/Lato.css'
 import 'vfonts/FiraCode.css'
 // vue Router
 import router from "@/routers/index";
-import pinia from "@/store/index";
 
 const app = createApp(App)
 
-app.use(naive).use(router).use(pinia).mount("#app");
+app.use(naive).use(router).mount("#app");

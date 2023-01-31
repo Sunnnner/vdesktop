@@ -1,35 +1,33 @@
 <template>
-    <n-card >
+    <n-card>
         <n-row>
             <h3>编辑配置信息：</h3>
-            
+
             <n-col :span="24">
                 <n-form ref="formRef" :model="model" :rules="rules">
                     <n-form-item path="appid" label="APPID">
-                        <n-input v-model:value="model.appid"  placeholder="输入appid" />
+                        <n-input v-model:value="model.appid" placeholder="输入appid" />
                     </n-form-item>
                     <n-form-item path="app_secret" label="SECRET">
-                        <n-input v-model:value="model.app_secret"  placeholder="输入app secret"  />
+                        <n-input v-model:value="model.app_secret" placeholder="输入app secret" />
                     </n-form-item>
                     <n-form-item path="host" label="域名">
-                        <n-input v-model:value="model.host"  placeholder="输入host"  />
+                        <n-input v-model:value="model.host" placeholder="输入host" />
                     </n-form-item>
                     <n-form-item path="default_vm" label="默认VM">
-                        <n-input v-model:value="model.default_vm"  placeholder="输入默认启动的虚拟主机"  />
+                        <n-input v-model:value="model.default_vm" placeholder="输入默认启动的虚拟主机" />
                     </n-form-item>
                     <n-row :gutter="[0, 24]">
                         <n-col :span="18">
                             <div style="display: flex; justify-content: flex-end">
-                                <n-button @click="openFile"
-                                    round type="primary">
+                                <n-button @click="openFile" round type="primary">
                                     导入配置文件
                                 </n-button>
                             </div>
                         </n-col>
                         <n-col :span="6">
                             <div style="display: flex; justify-content: flex-end">
-                                <n-button
-                                    @click="saveConfig"
+                                <n-button @click="saveConfig"
                                     :disabled="model.app_secret === null && model.default_vm === null && model.appid === null"
                                     round type="primary">
                                     保存
@@ -53,8 +51,7 @@ import {
 import { invoke } from '@tauri-apps/api/tauri';
 import { open } from '@tauri-apps/api/dialog';
 import { useMessage } from 'naive-ui';
-import {GlobalStore} from "@/store";
-import {useRouter} from "vue-router";
+import { useRouter } from "vue-router";
 
 
 interface ModelType {
@@ -63,17 +60,16 @@ interface ModelType {
     host: string | null
     default_vm: string | null
 }
-interface DataValue{
+interface DataValue {
     appid: string | null
     appsecret: string | null
     url: string | null
     'default-vm': string | null
 }
-interface SuccessMessage{
+interface SuccessMessage {
     message: string
 }
 const router = useRouter();
-const globalStore = GlobalStore();
 const message = useMessage()
 const formRef = ref<FormInst | null>(null)
 const modelRef = ref<ModelType>({
@@ -110,43 +106,48 @@ const rules: FormRules = {
 
 const openFile = async () => {
     const selected = await open({
-    filters: [{
-        name: 'vdesk',
-        extensions: ['yaml', 'yml']
-    }]
+        filters: [{
+            name: 'vdesk',
+            extensions: ['yaml', 'yml']
+        }]
     });
     if (selected) {
-    // user selected multiple files
-        try{
-            const data: DataValue = await invoke('read_yaml_file', {path: selected})
-            modelRef.value.appid = data?data.appid: '';
-            modelRef.value.app_secret = data?data.appsecret: '';
-            modelRef.value.host = data?data.url: '';
-            modelRef.value.default_vm = data?data['default-vm']: '';
+        // user selected multiple files
+        try {
+            const data: DataValue = await invoke('read_yaml_file', { path: selected })
+            modelRef.value.appid = data ? data.appid : '';
+            modelRef.value.app_secret = data ? data.appsecret : '';
+            modelRef.value.host = data ? data.url : '';
+            modelRef.value.default_vm = data ? data['default-vm'] : '';
         } catch (e: any) {
             message.error(e.message)
         }
-    }  else {
+    } else {
         message.warning('未选择文件')
     }
 }
 
 const saveConfig = async () => {
     if (formRef.value?.validate()) {
-        try{
-            const data: SuccessMessage = await invoke('save_yaml_file', {config: {appid: model.appid, appsecret: model.app_secret, url: model.host, 'default-vm': model.default_vm}})
+        try {
+            const data: SuccessMessage = await invoke('save_yaml_file', { config: { appid: model.appid, appsecret: model.app_secret, url: model.host, 'default-vm': model.default_vm } })
             message.success(data.message)
-            globalStore.setConfig(modelRef.value)
-            router.push({name: 'home'})
+            router.push({ name: 'home' })
         } catch (e: any) {
             message.error(e.message)
-        }        
+        }
     }
 }
 
-onMounted(() => {
-    if (globalStore.config) {
-        router.push({name: 'home'})
+onMounted(async () => {
+    // 判断是否存在配置文件
+    const is_file_exist = await invoke('is_exist_config')
+    if (is_file_exist){
+        router.push({ name: 'home' })
+    }
+    const is_vd_file = await invoke('is_install_vd')
+    if (!is_vd_file) {
+        message.warning('未安装vd')
     }
 })
 
