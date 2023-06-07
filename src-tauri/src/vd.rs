@@ -193,7 +193,7 @@ impl Vd {
         subprocess::Exec::cmd(Self::remote_viewer_path()?)
             .arg(remote_viewer_config)
             .popen()?
-            .wait()?;
+            .wait()?.success();
         Ok(())
     }
 

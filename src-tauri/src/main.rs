@@ -3,7 +3,7 @@
 // use serde_yaml;
 
 use std::string::FromUtf8Error;
-
+use std::io::Read;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -174,8 +174,13 @@ fn boot_screen(name: String) -> Result<()> {
                 .arg("vd").arg("spice").arg(name)
                 .spawn()?
     } else if cfg!(target_os = "macos"){
-        std::process::Command::new("vd")
-        .arg("spice").arg(name)
+        let mut file = std::fs::File::open("/Users/knd/vd.command")?;
+        let mut content = String::new();
+        file.read_to_string(&mut content)?;
+        let content = content.replace("$1", &name);
+        std::fs::write("/Users/knd/vd.command", content)?;
+        std::process::Command::new("open")
+        .arg("/Users/knd/vd.command")
                 .spawn()?
     } else {
         std::process::Command::new("sh")
