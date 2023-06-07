@@ -21,6 +21,13 @@ dirs = "4.0.0"
 serde_yaml = "0.9.14"
 serde_with = "2.0.1"
 thiserror = "1.0.37"
+log = "*"
+json = "*"
+subprocess = "*"
+reqwest = { version = "*", features = ["blocking", "json"] }
+anyhow = "1.0.66"
+defer = "*"
+
 
 [features]
 # by default Tauri runs in production mode

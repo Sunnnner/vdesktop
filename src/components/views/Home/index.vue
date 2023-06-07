@@ -33,6 +33,30 @@
         <n-grid-item>
           <n-popover trigger="hover">
             <template #trigger>
+              <n-button type="primary" @click="forceOff">强制关机</n-button>
+            </template>
+            <span> 强制关机</span>
+          </n-popover>
+        </n-grid-item>
+        <n-grid-item>
+          <n-popover trigger="hover">
+            <template #trigger>
+              <n-button type="primary" @click="lockedVm">锁定</n-button>
+            </template>
+            <span> 锁定</span>
+          </n-popover>
+        </n-grid-item>
+        <n-grid-item>
+          <n-popover trigger="hover">
+            <template #trigger>
+              <n-button type="primary" @click="unlockedVm">解锁</n-button>
+            </template>
+            <span>解锁</span>
+          </n-popover>
+        </n-grid-item>
+        <n-grid-item>
+          <n-popover trigger="hover">
+            <template #trigger>
               <n-button type="primary" :disabled=true>文件复制</n-button>
             </template>
             <span> Copy text or file to in:/home/clipboard[.txt]</span>
@@ -115,56 +139,101 @@ interface ResCode {
 const placement = ref<DrawerPlacement>('right')
 
 const play = (row: Song) => {
-  // 如果是锁定状态，禁用button
-  if (row.locked !== null) {
-    message.info('当前虚拟机已锁定，无法操作')
-  } else {
-    active.value = true
-    name.value = row.name
-  }
+  active.value = true
+  name.value = row.name
 }
 
-const turnOn = async () => {
-  try{
-    const res:ResCode = await invoke('turn_on_vm', { name: name.value })
-    if (res.code === "1"){
-      message.error(res.message)
-    } else {
-      message.success(res.message)
-    }
-  } catch (e: any) {
+const forceOff = () => {
+  invoke('force_off_vm', { name: name.value }).then((res) => {
+    message.success("强制关机成功")
+    window.location.reload()
+  }).catch((e: any) => {
     message.error(e.message)
-  }
+  })
 }
 
-const turnOff = async () => {
-  try{
-    const res:ResCode = await invoke('turn_off_vm', { name: name.value })
-    if (res.code === "1"){
-      message.error(res.message)
-    } else {
-      message.success(res.message)
-    }
-  } catch (e: any) {
+const lockedVm = () => {
+  invoke('locked_vm', { name: name.value }).then((res) => {
+    message.success("锁定成功")
+    window.location.reload()
+  }).catch((e: any) => {
     message.error(e.message)
-  }
+  })
 }
 
-const bootScreen = async () => {
-  await invoke('boot_screen', { name: name.value })
+const unlockedVm = () => {
+  invoke('unlocked_vm', { name: name.value }).then((res) => {
+    message.success("解锁成功")
+    window.location.reload()
+  }).catch((e: any) => {
+    message.error(e.message)
+  })
+}
+
+const turnOn = () => {
+  invoke('turn_on_vm', { name: name.value }).then((res) => {
+    message.success("开机成功")
+    window.location.reload()
+  }).catch((e: any) => {
+    message.error(e.message)
+  })
+}
+
+const turnOff = () => {
+  invoke('turn_off_vm', { name: name.value }).then((res) => {
+    message.success("关机成功")
+    window.location.reload()
+  }).catch((e: any) => {
+    message.error(e.message)
+  })
+}
+
+const bootScreen =()=> {
+  invoke('boot_screen', { name: name.value }).then((res) => {
+    message.success("启动界面成功")
+    window.location.reload()
+  }).catch((e: any) => {
+    message.error(e.message)
+  })
 }
 
 const data = ref<Song[]>()
 
-onMounted(async () => {
-  const res: ResValue[] = await invoke('list_vm');
-  data.value = res.map((item, index) => {
-    return {
-      no: index + 1,
-      name: item.vms,
-      locked: item.locked
-    }
+interface User{
+  id: number;
+  name: string;
+}
+
+interface Machine{
+  id: Number,
+  name: String,
+  vmid: String,
+  node: Node,
+  locked_by: User,
+}
+
+function get_list_vm(){
+  invoke('list_vm').then((res: any) => {
+    data.value = res.map((item: Machine) => {
+      return {
+        no: item.id,
+        name: item.name,
+        locked: item.locked_by?item.locked_by.name:null
+      }
+    })
+  }).catch((e: any) => {
+    message.error(e.message)
   })
+}
+
+
+
+onMounted(async () => {
+  get_list_vm()
+  // 定时任务每10s刷新页面
+  setInterval(() => {
+    window.location.reload()
+  }, 10000)
 })
 
 </script>

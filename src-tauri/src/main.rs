@@ -1,7 +1,4 @@
-#![cfg_attr(
-    all(target_os = "windows"),
-    windows_subsystem = "windows"
-)]
+#![cfg_attr(all(target_os = "windows"), windows_subsystem = "windows")]
 // use dirs;
 // use serde_yaml;
 
@@ -10,12 +7,8 @@ use std::string::FromUtf8Error;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
-
-// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+mod vd;
+use vd::Machine;
 
 #[serde_as]
 #[derive(Debug, serde::Serialize, thiserror::Error)]
@@ -45,11 +38,33 @@ pub enum Error {
         #[from]
         tauri::api::Error,
     ),
+    #[error("reqwest error: {0}")]
+    Reqwest(
+        #[serde_as(as = "DisplayFromStr")]
+        #[from]
+        reqwest::Error,
+    ),
+    #[error("json error: {0}")]
+    Json(
+        #[serde_as(as = "DisplayFromStr")]
+        #[from]
+        json::Error,
+    ),
+    #[error("anyhow error")]
+    Anyhow(
+        #[serde_as(as = "DisplayFromStr")]
+        #[from]
+        anyhow::Error,
+    ),
+    #[error("vd error")]
+    Vd(
+        #[serde_as(as = "DisplayFromStr")]
+        #[from]
+        vd::Error,
+    ),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-// type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Config {
@@ -61,21 +76,8 @@ struct Config {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct VmList {
-    vms: String,
-    // string or null
-    locked: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 struct SuccessMessage {
     message: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct CodeMessage {
-    message: String,
-    code: String,
 }
 
 #[tauri::command]
@@ -112,99 +114,56 @@ fn save_yaml_file(config: Config) -> Result<SuccessMessage> {
 
 // 列出所有的虚拟机
 #[tauri::command]
-fn list_vm() -> Result<Vec<VmList>> {
-    let mut vms = Vec::new();
-    let output = if cfg!(target_os = "windows") {
-        std::process::Command::new("powershell")
-                .arg(r#"vd list"#)
-                .output()?
-    } else {
-        std::process::Command::new("sh")
-                .arg(r#"vd list"#)
-                .output()?
-    };
-    let stdout = String::from_utf8(output.stdout)?;
-    for line in stdout.lines() {
-        if line.contains("!") {
-            let vm = line.split("!!").collect::<Vec<&str>>();
-            let name = vm[0].trim().split('-').collect::<Vec<&str>>()[1]
-                .split("(")
-                .collect::<Vec<&str>>()[0];
-            let locked = vm[1].trim();
-            vms.push(VmList {
-                vms: name.to_string(),
-                locked: Some(locked.to_string()),
-            });
-        } else {
-            let vm = line.trim().split('-').collect::<Vec<&str>>()[1]
-                .split("(")
-                .collect::<Vec<&str>>()[0];
-            vms.push(VmList {
-                vms: vm.to_string(),
-                locked: None,
-            });
-        }
-    }
+fn list_vm() -> Result<Vec<Machine>> {
+    let vd = vd::Vd::new()?;
+    let vms = vd.list()?;
     Ok(vms)
 }
 
+// 开机
 #[tauri::command]
-fn turn_on_vm(name: String) -> Result<CodeMessage> {
-    let output = if cfg!(target_os = "windows") {
-        std::process::Command::new("powershell")
-                .arg("vd").arg("start").arg(name)
-                .status()?
-    } else {
-        std::process::Command::new("sh")
-                .arg("vd").arg("start").arg(name)
-                .status()?
-    };
-
-    let msg = match output.code() {
-        None => CodeMessage {
-            message: "开机失败".to_string(),
-            code: "1".to_string(),
-        },
-        Some(0) => CodeMessage {
-            message: "开机成功".to_string(),
-            code: "0".to_string(),
-        },
-        _ => CodeMessage {
-            message: "开机失败,设备已开机".to_string(),
-            code: "1".to_string(),
-        },
-    };
-    Ok(msg)
+fn turn_on_vm(name: String) -> Result<()> {
+    let vd = vd::Vd::new()?;
+    let name = name.replace(" ", "");
+    vd.start(&name)?;
+    Ok(())
 }
 
 // 关机
 #[tauri::command]
-fn turn_off_vm(name: String) ->Result<CodeMessage> {
-    let output = if cfg!(target_os = "windows") {
-        std::process::Command::new("powershell")
-                .arg("vd").arg("stop").arg(name).arg("-y")
-                .status()?
-    } else {
-        std::process::Command::new("sh")
-                .arg("vd").arg("stop").arg(name).arg("-y")
-                .status()?
-    };
+fn turn_off_vm(name: String) -> Result<()> {
+    let vd = vd::Vd::new()?;
+    let name: String = name.replace(" ", "");
+    vd.stop(&name)?;
+    Ok(())
+}
 
-    let msg = match output.code() {
-        None => CodeMessage {
-            message: "关机失败".to_string(),
-            code: "1".to_string(),
-        },
-        Some(0) => CodeMessage {
-            message: "关机成功".to_string(),
-            code: "0".to_string(),
-        },
-        _ => CodeMessage {
-            message: "关机失败,设备已关机".to_string(),
-            code: "1".to_string(),
-        },
-    };
-    Ok(msg)
+// 强制关机
+#[tauri::command]
+fn force_off_vm(name: String) -> Result<()> {
+    let vd = vd::Vd::new()?;
+    let name: String = name.replace(" ", "");
+    vd.do_login(&name)?;
+    vd.force_stop(&name)?;
+    Ok(())
+}
+
+// 锁定
+#[tauri::command]
+fn locked_vm(name: String) -> Result<()> {
+    let vd = vd::Vd::new()?;
+    let name: String = name.replace(" ", "");
+    vd.lock(&name)?;
+    Ok(())
+}
+
+// 解锁
+#[tauri::command]
+fn unlocked_vm(name: String) -> Result<()> {
+    let vd = vd::Vd::new()?;
+    let name: String = name.replace(" ", "");
+    vd.unlock(&name)?;
+    Ok(())
 }
 
 // 启动画面
@@ -214,6 +173,10 @@ fn boot_screen(name: String) -> Result<()> {
         std::process::Command::new("powershell")
                 .arg("vd").arg("spice").arg(name)
                 .spawn()?
+    } else if cfg!(target_os = "macos"){
+        std::process::Command::new("vd")
+        .arg("spice").arg(name)
+                .spawn()?
     } else {
         std::process::Command::new("sh")
                 .arg("vd").arg("spice").arg(name)
@@ -222,7 +185,6 @@ fn boot_screen(name: String) -> Result<()> {
     println!("result: {:?}", _result);
     Ok(())
 }
-
 
 // 判断是否存在配置文件
 #[tauri::command]
@@ -249,7 +211,6 @@ fn is_exist_config() -> Result<bool> {
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            greet,
             read_yaml_file,
             save_yaml_file,
             list_vm,
@@ -257,6 +218,9 @@ fn main() {
             boot_screen,
             turn_off_vm,
             is_exist_config,
+            force_off_vm,
+            locked_vm,
+            unlocked_vm
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

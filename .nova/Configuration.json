@@ -1,0 +1,4 @@
+{
+  "com.kilb.rust.lint-command" : "clippy",
+  "python.interpreter" : "~\/.pyenv\/versions\/fastapi\/bin\/python3.9"
+}
