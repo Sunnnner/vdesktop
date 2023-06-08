@@ -174,10 +174,11 @@ fn boot_screen(name: String) -> Result<()> {
                 .arg("vd").arg("spice").arg(name)
                 .spawn()?
     } else if cfg!(target_os = "macos"){
+        // 在当前目录创建一个可执行的vd.command文件并将#!/bin/bash vd spice $1写入
         let mut file = std::fs::File::open("/Users/knd/vd.command")?;
         let mut content = String::new();
         file.read_to_string(&mut content)?;
-        let content = content.replace("$1", &name);
+        content = format!("#!/bin/bash\nvd spice {}", name);
         std::fs::write("/Users/knd/vd.command", content)?;
         std::process::Command::new("open")
         .arg("/Users/knd/vd.command")
@@ -187,7 +188,6 @@ fn boot_screen(name: String) -> Result<()> {
                 .arg("vd").arg("spice").arg(name)
                 .spawn()?
     };
-    println!("result: {:?}", _result);
     Ok(())
 }
 
