@@ -8,15 +8,19 @@
         </n-form-item>
   
         <n-form-item label="SECRET" required>
-          <n-input v-model:value="model.app_secret" placeholder="输入app secret" />
+          <n-input v-model:value="model.appsecret" placeholder="输入app secret" />
         </n-form-item>
   
         <n-form-item label="域名" required>
-          <n-input v-model:value="model.host" placeholder="输入host" />
+          <n-input v-model:value="model.url" placeholder="输入url" />
         </n-form-item>
   
         <n-form-item label="默认VM" required>
-          <n-input v-model:value="model.default_vm" placeholder="输入默认启动的虚拟主机" />
+          <n-input v-model:value="model.name" placeholder="输入默认启动的虚拟主机" />
+        </n-form-item>
+
+        <n-form-item label="默认服务器" required>
+          <n-input v-model:value="model.server" placeholder="输入默认虚拟机服务器" />
         </n-form-item>
   
         <n-row>
@@ -45,23 +49,25 @@
   
   interface Model {
     appid: string | null;
-    app_secret: string | null;
-    host: string | null;
-    default_vm: string | null;
+    appsecret: string | null;
+    url: string | null;
+    name: string | null;
+    server: string | null;
   }
   
   const rules: FormRules = {
     appid: [{ required: true, message: '请输入APPID', trigger: 'blur' }],
-    app_secret: [{ required: true, message: '请输入SECRET', trigger: 'blur' }],
-    host: [{ required: true, message: '请输入域名', trigger: 'blur' }],
-    default_vm: [{ required: true, message: '请输入默认启动的虚拟主机', trigger: 'blur' }],
+    appsecret: [{ required: true, message: '请输入SECRET', trigger: 'blur' }],
+    url: [{ required: true, message: '请输入域名', trigger: 'blur' }],
+    name: [{ required: true, message: '请输入默认启动的虚拟主机', trigger: 'blur' }],
   };
   
   const model = ref<Model>({
     appid: null,
-    app_secret: null,
-    host: 'https://vdesk.knd.io',
-    default_vm: null,
+    appsecret: null,
+    url: 'https://vdesk.knd.io',
+    name: null,
+    server: "beijing",
   });
   
   const formRef = ref<FormInst | null>(null);
@@ -91,6 +97,7 @@
         message.success('保存成功');
         router.push({ name: 'home' });
       } catch (e: any) {
+        console.log(e.m)
         message.error(e.message);
       }
     }

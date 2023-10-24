@@ -16,6 +16,7 @@ struct Config {
     appsecret: String,
     url: String,
     name: String,
+    server: String,
 }
 
 #[derive(Clone, Debug)]

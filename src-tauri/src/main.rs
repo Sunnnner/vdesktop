@@ -71,8 +71,8 @@ struct Config {
     appid: String,
     appsecret: String,
     url: String,
-    #[serde(rename = "default-vm")]
-    default_vm: String,
+    name: String,
+    server: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -83,6 +83,22 @@ struct SuccessMessage {
 #[tauri::command]
 fn read_yaml_file(path: String) -> Result<Config> {
     let config_file = std::fs::File::open(path)?;
+    let config: serde_yaml::Value = serde_yaml::from_reader(config_file).unwrap();
+    let config = serde_yaml::from_value(config)?;
+    Ok(config)
+}
+
+#[tauri::command]
+fn return_yaml_file() -> Result<Config> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        Error::Fs(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "home dir not found",
+        ))
+    })?;
+    let config_dir = home_dir.join(".config");
+    let config_path = config_dir.join("vdesk.yaml");
+    let config_file = std::fs::File::open(config_path)?;
     let config: serde_yaml::Value = serde_yaml::from_reader(config_file).unwrap();
     let config = serde_yaml::from_value(config)?;
     Ok(config)
@@ -213,6 +229,45 @@ fn is_exist_config() -> Result<bool> {
     }
 }
 
+// 打开vdesk.yaml将配置文件中的url改为北京服务器url
+#[tauri::command]
+fn switch_bj_server() -> Result<()> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        Error::Fs(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "home dir not found",
+        ))
+    })?;
+    let config_dir = home_dir.join(".config");
+    let config_path = config_dir.join("vdesk.yaml");
+    let mut config_file = std::fs::File::open(&config_path)?;
+    let mut content = String::new();
+    config_file.read_to_string(&mut content)?;
+    content = content.replace("https://vdesk-tj.knd.io", "https://vdesk.knd.io");
+    std::fs::write(config_path, content)?;
+    Ok(())
+}
+
+// 打开vdesk.yaml将配置文件中的url改为天津服务器url
+#[tauri::command]
+fn switch_tj_server() -> Result<()> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        Error::Fs(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "home dir not found",
+        ))
+    })?;
+    let config_dir = home_dir.join(".config");
+    let config_path = config_dir.join("vdesk.yaml");
+    let mut config_file = std::fs::File::open(&config_path)?;
+    let mut content = String::new();
+    config_file.read_to_string(&mut content)?;
+    content = content.replace("https://vdesk.knd.io", "https://vdesk-tj.knd.io");
+    std::fs::write(config_path, content)?;
+    Ok(())
+}
+
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -225,7 +280,10 @@ fn main() {
             is_exist_config,
             force_off_vm,
             locked_vm,
-            unlocked_vm
+            unlocked_vm,
+            switch_tj_server,
+            switch_bj_server,
+            return_yaml_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

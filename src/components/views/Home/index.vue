@@ -65,10 +65,20 @@
       </n-grid>
     </n-drawer-content>
   </n-drawer>
+  <n-card :bordered="false" style="display: contents; text-align: center;">
+    <n-switch :rail-style="railStyle">
+    <template #checked>
+      天津服务器
+    </template>
+    <template #unchecked>
+      北京服务器
+    </template>
+  </n-switch>
+  </n-card>
 </template>
   
 <script lang="ts" setup>
-import { h, onMounted, ref } from "vue";
+import { CSSProperties, h, onMounted, ref } from "vue";
 import { invoke } from '@tauri-apps/api/tauri';
 import { DataTableColumns, DrawerPlacement, NButton } from "naive-ui";
 import { useMessage } from 'naive-ui';
@@ -77,12 +87,41 @@ const message = useMessage()
 const titleValue = ref<string>();
 titleValue.value = `虚拟机列表`.toString();
 const active = ref(false)
-
 const name = ref('')
 
-interface ResValue {
-  vms: string;
-  locked: string | null;
+const railStyle = ({
+  focused,
+  checked
+}: {
+  focused: boolean
+  checked: boolean
+}) => {
+  const style: CSSProperties = {}
+  console.log(focused, checked)
+  if (checked) {
+    style.background = '#d03050'
+    if (focused) {
+      style.boxShadow = '0 0 0 6px #d0305040'
+      invoke('switch_tj_server').then((res) => {
+        message.success("切换天津服务器成功")
+        // window.location.reload()
+      }).catch((e: any) => {
+        message.error(e)
+      })
+    }
+  } else {
+    style.background = '#2080f0'
+    if (focused) {
+      style.boxShadow = '0 0 0 6px #2080f040'
+      invoke('switch_bj_server').then((res) => {
+        message.success("切换北京服务器成功")
+        // window.location.reload()
+      }).catch((e: any) => {
+        message.error(e)
+      })
+    }
+  }
+  return style
 }
 
 type Song = {
@@ -130,11 +169,6 @@ const columns: DataTableColumns<Song> = [
     }
   }
 ]
-
-interface ResCode {
-  message: string,
-  code: string
-}
 
 const placement = ref<DrawerPlacement>('right')
 
@@ -230,10 +264,12 @@ function get_list_vm(){
 
 onMounted(async () => {
   get_list_vm()
+
+  
   // 定时任务每10s刷新页面
-  setInterval(() => {
-    window.location.reload()
-  }, 10000)
+  // setInterval(() => {
+  //   window.location.reload()
+  // }, 10000)
 })
 
 </script>
