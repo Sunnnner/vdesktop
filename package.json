@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
-    "dev:diff": "tauri dev -f verge-dev",
-    "build": "tauri build",
+    "dev:diff": "tauri dev -f vdesktop-dev",
+    "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "web:dev": "vite",
