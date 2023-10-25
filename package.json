@@ -1,18 +1,13 @@
 {
   "name": "vdesktop",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.3",
   "type": "module",
   "scripts": {
-    "dev": "tauri dev",
-    "dev:diff": "tauri dev -f vdesktop-dev",
+    "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri",
-    "web:dev": "vite",
-    "web:build": "tsc && vite build",
-    "web:serve": "vite preview",
-    "portable": "node scripts/portable.mjs"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.1.0",
