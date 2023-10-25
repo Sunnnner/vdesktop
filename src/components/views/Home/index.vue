@@ -66,14 +66,21 @@
     </n-drawer-content>
   </n-drawer>
   <n-card :bordered="false" style="display: contents; text-align: center;">
-    <n-switch :rail-style="railStyle">
-    <template #checked>
-      天津服务器
-    </template>
-    <template #unchecked>
-      北京服务器
-    </template>
-  </n-switch>
+  <n-radio-group name="radiogroup" v-model:value="value" :click="testClick(value)" :default-value="defaultValue">
+    <n-space>
+      <n-radio v-for="song in songs" :key="song.value" :value="song.value" >
+        {{ song.label }}
+      </n-radio>
+    </n-space>
+  </n-radio-group>
+  </n-card>
+  <n-card :bordered="false" style="display: contents; text-align: center;">
+    <n-gradient-text
+    gradient="linear-gradient(200deg, red 0%, green 50%, blue 100%)" size="large"
+    >
+    当前服务器:    {{server_value}}
+    </n-gradient-text>
+    
   </n-card>
 </template>
   
@@ -88,41 +95,34 @@ const titleValue = ref<string>();
 titleValue.value = `虚拟机列表`.toString();
 const active = ref(false)
 const name = ref('')
+const value = ref(null)
+const defaultValue = ref("")
+const server_value = ref("")
 
-const railStyle = ({
-  focused,
-  checked
-}: {
-  focused: boolean
-  checked: boolean
-}) => {
-  const style: CSSProperties = {}
-  console.log(focused, checked)
-  if (checked) {
-    style.background = '#d03050'
-    if (focused) {
-      style.boxShadow = '0 0 0 6px #d0305040'
-      invoke('switch_tj_server').then((res) => {
-        message.success("切换天津服务器成功")
-        // window.location.reload()
-      }).catch((e: any) => {
-        message.error(e)
-      })
-    }
-  } else {
-    style.background = '#2080f0'
-    if (focused) {
-      style.boxShadow = '0 0 0 6px #2080f040'
-      invoke('switch_bj_server').then((res) => {
-        message.success("切换北京服务器成功")
-        // window.location.reload()
-      }).catch((e: any) => {
-        message.error(e)
-      })
-    }
+
+const songs = [
+        {
+          value: "beijing",
+          label: "北京服务器"
+        },
+        {
+          value: 'tianjing',
+          label: '天津服务器'
+        }
+      ]
+
+const testClick = (value: any) => {
+  if (value === "beijing"){
+    invoke("save_server_yaml_file", {server: "北京"})
+    invoke("switch_bj_server")
+    window.location.reload()
+  }else if (value === "tianjing"){
+    invoke("save_server_yaml_file", {server: "天津"})
+    invoke("switch_tj_server")
+    window.location.reload()  
   }
-  return style
 }
+
 
 type Song = {
   no: number
@@ -260,12 +260,15 @@ function get_list_vm(){
   })
 }
 
+invoke('read_server_yaml_file').then((res: any) => {
+  server_value.value = res
+}).catch((e: any) => {
+  message.error(e.message)
+})
 
 
 onMounted(async () => {
   get_list_vm()
-
-  
   // 定时任务每10s刷新页面
   // setInterval(() => {
   //   window.location.reload()

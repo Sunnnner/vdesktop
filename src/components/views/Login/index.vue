@@ -18,10 +18,6 @@
         <n-form-item label="默认VM" required>
           <n-input v-model:value="model.name" placeholder="输入默认启动的虚拟主机" />
         </n-form-item>
-
-        <n-form-item label="默认服务器" required>
-          <n-input v-model:value="model.server" placeholder="输入默认虚拟机服务器" />
-        </n-form-item>
   
         <n-row>
           <n-col span="24">
@@ -52,7 +48,6 @@
     appsecret: string | null;
     url: string | null;
     name: string | null;
-    server: string | null;
   }
   
   const rules: FormRules = {
@@ -67,7 +62,6 @@
     appsecret: null,
     url: 'https://vdesk.knd.io',
     name: null,
-    server: "beijing",
   });
   
   const formRef = ref<FormInst | null>(null);

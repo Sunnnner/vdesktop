@@ -72,7 +72,6 @@ struct Config {
     appsecret: String,
     url: String,
     name: String,
-    server: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -268,6 +267,48 @@ fn switch_tj_server() -> Result<()> {
 }
 
 
+#[tauri::command]
+fn save_server_yaml_file(server: String) -> Result<SuccessMessage> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        Error::Fs(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "home dir not found",
+        ))
+    })?;
+    let config_dir = home_dir.join(".config");
+    if !config_dir.exists() {
+        std::fs::create_dir(&config_dir)?;
+    }
+    let config_path = config_dir.join("server.yaml");
+    if config_path.exists() {
+        // 删除文件
+        std::fs::remove_file(&config_path)?;
+    }
+    let config = serde_yaml::to_string(&server)?;
+    std::fs::write(config_path, config)?;
+    Ok(SuccessMessage {
+        message: "保存成功".to_string(),
+    })
+}
+
+#[tauri::command]
+fn read_server_yaml_file() -> Result<String> {
+    let home_dir = dirs::home_dir().ok_or_else(|| {
+        Error::Fs(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "home dir not found",
+        ))
+    })?;
+    let config_dir = home_dir.join(".config");
+    let config_path = config_dir.join("server.yaml");
+    let config_file = std::fs::File::open(config_path)?;
+    let config: serde_yaml::Value = serde_yaml::from_reader(config_file).unwrap();
+    let config = serde_yaml::from_value(config)?;
+    Ok(config)
+}
+
+
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -283,7 +324,9 @@ fn main() {
             unlocked_vm,
             switch_tj_server,
             switch_bj_server,
-            return_yaml_file
+            return_yaml_file,
+            save_server_yaml_file,
+            read_server_yaml_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
