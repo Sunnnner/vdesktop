@@ -34,8 +34,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: '${{ steps.get_version.outputs.VERSION }}'
-          release_name: 'app ${{ steps.get_version.outputs.VERSION }}'
-          body: 'See the assets to download this version and install.'
+          release_name: 'vdesktop ${{ steps.get_version.outputs.VERSION }}'
+          body: '内网远控程序'
 
   # 编译 Tauri
   build-tauri:
@@ -53,12 +53,12 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v1
         with:
-          node-version: 16
+          node-version: 16.19.1
       # 安装pnpm
       - name: setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 6.32.9
+          version: 8.6.1
       # 安装 Rust
       - name: Install Rust stable
         uses: actions-rs/toolchain@v1

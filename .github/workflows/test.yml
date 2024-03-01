@@ -36,7 +36,7 @@ jobs:
       
       - uses: pnpm/action-setup@v2
         with:
-          version: 6.32.9
+          version: 8.6.1
       - uses: actions/setup-node@v3
         with:
           node-version: 'lts/*'
@@ -54,6 +54,6 @@ jobs:
         with:
           tagName: v__VERSION__ # This only works if your workflow triggers on new tags.
           releaseName: 'vdesktop v__VERSION__' # tauri-action replaces \_\_VERSION\_\_ with the app version.
-          releaseBody: 'See the assets to download and install this version.'
+          releaseBody: '内网远控程序'
           releaseDraft: false
           prerelease: true

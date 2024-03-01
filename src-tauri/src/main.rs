@@ -183,7 +183,7 @@ fn unlocked_vm(name: String) -> Result<()> {
 
 // 启动画面
 #[tauri::command]
-fn boot_screen(name: String) -> Result<()> {
+async fn boot_screen(name: String) -> Result<()> {
     let _output = if cfg!(target_os = "windows") {
         std::process::Command::new("powershell")
             .arg("vd").arg("spice").arg(&name)
@@ -311,6 +311,7 @@ fn read_server_yaml_file() -> Result<String> {
 
 
 fn main() {
+    let _ = fix_path_env::fix();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             read_yaml_file,
