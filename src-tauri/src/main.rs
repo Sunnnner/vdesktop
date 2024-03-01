@@ -184,24 +184,25 @@ fn unlocked_vm(name: String) -> Result<()> {
 // 启动画面
 #[tauri::command]
 fn boot_screen(name: String) -> Result<()> {
-    let _result = if cfg!(target_os = "windows") {
+    let _output = if cfg!(target_os = "windows") {
         std::process::Command::new("powershell")
-                .arg("vd").arg("spice").arg(name)
-                .spawn()?
-    } else if cfg!(target_os = "macos"){
-        // 在当前目录创建一个可执行的vd.command文件并将#!/bin/bash vd spice $1写入
-        let mut file = std::fs::File::open("/Users/knd/vd.command")?;
-        let mut content = String::new();
-        file.read_to_string(&mut content)?;
-        content = format!("#!/bin/bash\nvd spice {}", name);
-        std::fs::write("/Users/knd/vd.command", content)?;
-        std::process::Command::new("open")
-        .arg("/Users/knd/vd.command")
-                .spawn()?
+            .arg("vd").arg("spice").arg(&name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output()?
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("bash")
+            .arg("-c")
+            .arg(format!("vd spice {}", &name))
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output()?
     } else {
         std::process::Command::new("sh")
-                .arg("vd").arg("spice").arg(name)
-                .spawn()?
+            .arg("vd").arg("spice").arg(&name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .output()?
     };
     Ok(())
 }
