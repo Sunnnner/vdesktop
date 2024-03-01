@@ -186,8 +186,8 @@ fn unlocked_vm(name: String) -> Result<()> {
 async fn boot_screen(name: String) -> Result<()> {
     let _output = if cfg!(target_os = "windows") {
         std::process::Command::new("powershell")
-            .arg("-WindowStyle Hidden -Command Start-Process")
-            .arg("vd").arg("spice").arg(&name)
+            .arg("-WindowStyle").arg("Hidden")
+            .arg("-Command").arg(format!("Start-Process vd -ArgumentList 'spice,{}'", &name))
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .output()?
