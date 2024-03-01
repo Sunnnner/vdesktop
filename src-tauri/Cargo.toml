@@ -1,8 +1,8 @@
 [package]
 name = "vdesktop"
-version = "1.5.1"
-description = "A Tauri App"
-authors = ["you"]
+version = "1.5.2"
+description = "A virtual desktop application for Windows, macOS, and Linux."
+authors = ["whitek"]
 license = ""
 repository = ""
 edition = "2021"
