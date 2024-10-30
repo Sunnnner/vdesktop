@@ -1,14 +1,16 @@
 use json::JsonValue;
 use serde::{Deserialize, Serialize};
-use std::io::{LineWriter, Write};
 use std::path::PathBuf;
 use thiserror::Error;
+use tokio::fs;
+use std::sync::Arc;
 
 #[cfg(windows)]
 use registry::{Data, Hive, Security};
 
 #[cfg(windows)]
 use anyhow::anyhow;
+use tokio::io::AsyncWriteExt;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Config {
@@ -20,7 +22,7 @@ struct Config {
 
 #[derive(Clone, Debug)]
 pub struct Vd {
-    client: reqwest::blocking::Client,
+    client: reqwest::Client,  // 改为异步客户端
     config: Config,
 }
 
@@ -69,15 +71,19 @@ pub struct Machine {
 pub type SpiceConfig = JsonValue;
 
 impl Vd {
-    pub fn new() -> Result<Self> {
+    pub async fn new() -> Result<Self> {
         let config = dirs::home_dir()
             .ok_or(Error::Unknown)?
             .join(".config")
             .join("vdesk.yaml");
-        let config: Config = serde_yaml::from_str(std::fs::read_to_string(config)?.as_str())?;
-        let client = reqwest::blocking::ClientBuilder::new()
+
+        let config_content = fs::read_to_string(config).await?;
+        let config: Config = serde_yaml::from_str(&config_content)?;
+
+        let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()?;
+
         Ok(Self { config, client })
     }
 
@@ -85,135 +91,152 @@ impl Vd {
         &self,
         method: reqwest::Method,
         path: S,
-    ) -> reqwest::blocking::RequestBuilder {
+    ) -> reqwest::RequestBuilder {
         let url = format!("{}{}", self.config.url, path.as_ref());
         self.client
             .request(method, url)
             .basic_auth(&self.config.appid, Some(&self.config.appsecret))
     }
 
-    fn get<S: AsRef<str>>(&self, path: S) -> reqwest::blocking::RequestBuilder {
+    fn get<S: AsRef<str>>(&self, path: S) -> reqwest::RequestBuilder {
         self.request(reqwest::Method::GET, path)
     }
 
-    fn post<S: AsRef<str>>(&self, path: S) -> reqwest::blocking::RequestBuilder {
+    fn post<S: AsRef<str>>(&self, path: S) -> reqwest::RequestBuilder {
         self.request(reqwest::Method::POST, path)
     }
 
-    pub fn list(&self) -> Result<Vec<Machine>> {
-        let machines: Vec<Machine> = self.get("/machines/").send()?.json()?;
+    pub async fn list(&self) -> Result<Vec<Machine>> {
+        let machines: Vec<Machine> = self.get("/machines/").send().await?.json().await?;
         Ok(machines)
     }
 
-    fn vm_op<V: AsRef<str>, O: AsRef<str>>(
+    async fn vm_op<V: AsRef<str>, O: AsRef<str>>(
         &self,
         name: V,
         op: O,
-    ) -> reqwest::Result<reqwest::blocking::Response> {
+    ) -> reqwest::Result<reqwest::Response> {
         self.post(format!("/machines/{}/{}", name.as_ref(), op.as_ref()))
             .send()
+            .await
     }
 
-    fn vm_simple_op<V: AsRef<str>, O: AsRef<str>>(&self, name: V, op: O) -> Result<()> {
-        self.vm_op(name, op)?.error_for_status()?;
+    async fn vm_simple_op<V: AsRef<str>, O: AsRef<str>>(&self, name: V, op: O) -> Result<()> {
+        self.vm_op(name, op).await?.error_for_status()?;
         Ok(())
     }
 
-    pub fn start<V: AsRef<str>>(&self, name: V) -> Result<()> {
-        self.vm_simple_op(name, "start")
+    pub async fn start<V: AsRef<str>>(&self, name: V) -> Result<()> {
+        self.vm_simple_op(name, "start").await
     }
 
-    pub fn stop<V: AsRef<str>>(&self, name: V) -> Result<()> {
-        self.vm_simple_op(name, "stop")
+    pub async fn stop<V: AsRef<str>>(&self, name: V) -> Result<()> {
+        self.vm_simple_op(name, "stop").await
     }
 
-    pub fn lock<V: AsRef<str>>(&self, name: V) -> Result<()> {
-        self.vm_simple_op(name, "lock")
+    pub async fn lock<V: AsRef<str>>(&self, name: V) -> Result<()> {
+        self.vm_simple_op(name, "lock").await
     }
 
-    pub fn unlock<V: AsRef<str>>(&self, name: V) -> Result<()> {
-        self.vm_simple_op(name, "unlock")
+    pub async fn unlock<V: AsRef<str>>(&self, name: V) -> Result<()> {
+        self.vm_simple_op(name, "unlock").await
     }
 
-    pub fn spice<V: AsRef<str>>(&self, name: V) -> Result<SpiceConfig> {
-        let configs: SpiceConfig = json::parse(self.vm_op(name, "spice")?.text()?.as_str())?;
+    pub async fn spice<V: AsRef<str>>(&self, name: V) -> Result<SpiceConfig> {
+        let response = self.vm_op(name, "spice").await?;
+        let text = response.text().await?;
+        let configs: SpiceConfig = json::parse(&text)?;
         Ok(configs)
     }
 
     #[cfg(windows)]
-    fn remote_viewer_path() -> anyhow::Result<PathBuf> {
-        let key = Hive::LocalMachine.open(
-            r"SOFTWARE\Classes\VirtViewer.vvfile\shell\open\command",
-            Security::Read,
-        )?;
-        let data = key.value("")?;
-        // "C:\Program Files\VirtViewer v11.0-256\bin\remote-viewer.exe" "%1"
-        let s = match data {
-            Data::String(s) => s.to_string_lossy(),
-            _ => return Err(anyhow!("unexpected remote-viewer path")),
-        };
-
-        Ok(PathBuf::from(s[1..s.len() - 6].to_string()))
+    async fn remote_viewer_path() -> anyhow::Result<PathBuf> {
+        // 由于 registry 操作是同步的，我们需要在一个阻塞任务中执行它
+        tokio::task::spawn_blocking(|| {
+            let key = Hive::LocalMachine.open(
+                r"SOFTWARE\Classes\VirtViewer.vvfile\shell\open\command",
+                Security::Read,
+            )?;
+            let data = key.value("")?;
+            let s = match data {
+                Data::String(s) => s.to_string_lossy(),
+                _ => return Err(anyhow!("unexpected remote-viewer path")),
+            };
+            Ok(PathBuf::from(s[1..s.len() - 6].to_string()))
+        }).await?
     }
 
     #[cfg(not(windows))]
-    fn remote_viewer_path() -> anyhow::Result<PathBuf> {
+    async fn remote_viewer_path() -> anyhow::Result<PathBuf> {
         Ok(PathBuf::from("remote-viewer"))
     }
 
-    pub fn do_login<V: AsRef<str>>(&self, name: V) -> anyhow::Result<()> {
+    pub async fn do_login<V: AsRef<str>>(&self, name: V) -> anyhow::Result<()> {
         let name = name.as_ref();
-        let _ = self.start(name);
+        let _ = self.start(name).await;
 
-        self.lock(name)?;
+        self.lock(name).await?;
 
-        let _cleanup = defer::defer(|| {
-            let _ = self.unlock(name);
+        let vd = Arc::new(self.clone());
+        let name_clone = name.to_string();
+
+        // 创建清理函数
+        let _cleanup = defer::defer(move || {
+            let vd = vd.clone();
+            let name = name_clone.clone();
+            tokio::spawn(async move {
+                let _ = vd.unlock(name).await;
+            });
         });
 
-        let mut config = self.spice(name)?;
+        let mut config = self.spice(name).await?;
         config.insert("title", name)?;
+        config.insert("auto-resize", "mever")?;
+        config.insert("debug", false)?;
+        config.insert("cursor", "MODE")?;
+        config.insert("full-screen", true)?;
 
         let temp = std::env::temp_dir();
         let remote_viewer_config = temp.join(format!("__vd-remote-viewer-config-{}__", name));
 
+        // 文件操作改为异步
         {
-            let f = std::fs::File::create(remote_viewer_config.as_path())?;
-            let mut f = LineWriter::new(f);
-            f.write_all(b"[virt-viewer]\n")?;
+            let mut file = tokio::fs::File::create(&remote_viewer_config).await?;
+            file.write_all(b"[virt-viewer]\n").await?;
             if let SpiceConfig::Object(obj) = config {
                 for (k, v) in obj.iter() {
-                    f.write_all(format!("{}={}\n", k, v).as_bytes())?;
+                    file.write_all(format!("{}={}\n", k, v).as_bytes()).await?;
                 }
             };
-
-            f.flush()?;
+            file.flush().await?;
         }
 
-        subprocess::Exec::cmd(Self::remote_viewer_path()?)
+        // 运行外部命令
+        let remote_viewer = Self::remote_viewer_path().await?;
+        tokio::process::Command::new(remote_viewer)
             .arg(remote_viewer_config)
-            .popen()?
-            .wait()?.success();
-        Ok(())
-    }
-
-    pub fn login<V: AsRef<str>>(&self, name: V) -> anyhow::Result<()> {
-        let exe = std::env::current_exe()?;
-
-        subprocess::Exec::cmd(exe)
-            .arg("--login")
-            .arg(name.as_ref())
-            .detached()
-            .popen()?;
+            .spawn()?
+            .wait()
+            .await?;
 
         Ok(())
     }
 
-    pub fn force_stop<V: AsRef<str>>(&self, name: V) -> anyhow::Result<()> {
+    // pub async fn login<V: AsRef<str>>(&self, name: V) -> anyhow::Result<()> {
+    //     let exe = std::env::current_exe()?;
+    //
+    //     tokio::process::Command::new(exe)
+    //         .arg("--login")
+    //         .arg(name.as_ref())
+    //         .spawn()?;
+    //
+    //     Ok(())
+    // }
+
+    pub async fn force_stop<V: AsRef<str>>(&self, name: V) -> anyhow::Result<()> {
         let name = name.as_ref();
-        self.stop(name)?;
-        self.unlock(name)?;
-
+        self.stop(name).await?;
+        self.unlock(name).await?;
         Ok(())
     }
 }

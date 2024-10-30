@@ -6,9 +6,9 @@ use std::string::FromUtf8Error;
 use std::io::Read;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
-
 mod vd;
 use vd::Machine;
+use crate::vd::Vd;
 
 #[serde_as]
 #[derive(Debug, serde::Serialize, thiserror::Error)]
@@ -129,83 +129,64 @@ fn save_yaml_file(config: Config) -> Result<SuccessMessage> {
 
 // 列出所有的虚拟机
 #[tauri::command]
-fn list_vm() -> Result<Vec<Machine>> {
-    let vd = vd::Vd::new()?;
-    let vms = vd.list()?;
+async fn list_vm() -> Result<Vec<Machine>> {
+    let vd = Vd::new().await?;
+    let vms = vd.list().await?;
     Ok(vms)
 }
 
 // 开机
 #[tauri::command]
-fn turn_on_vm(name: String) -> Result<()> {
-    let vd = vd::Vd::new()?;
+async fn turn_on_vm(name: String) -> Result<()> {
+    let vd = Vd::new().await?;
     let name = name.replace(" ", "");
-    vd.start(&name)?;
+    vd.start(&name).await?;
     Ok(())
 }
 
 // 关机
 #[tauri::command]
-fn turn_off_vm(name: String) -> Result<()> {
-    let vd = vd::Vd::new()?;
+async fn turn_off_vm(name: String) -> Result<()> {
+    let vd = Vd::new().await?;
     let name: String = name.replace(" ", "");
-    vd.stop(&name)?;
+    vd.stop(&name).await?;
     Ok(())
 }
 
 // 强制关机
 #[tauri::command]
-fn force_off_vm(name: String) -> Result<()> {
-    let vd = vd::Vd::new()?;
+async fn force_off_vm(name: String) -> Result<()> {
+    let vd = Vd::new().await?;
     let name: String = name.replace(" ", "");
-    vd.do_login(&name)?;
-    vd.force_stop(&name)?;
+    vd.do_login(&name).await?;
+    vd.force_stop(&name).await?;
     Ok(())
 }
 
 // 锁定
 #[tauri::command]
-fn locked_vm(name: String) -> Result<()> {
-    let vd = vd::Vd::new()?;
+async fn locked_vm(name: String) -> Result<()> {
+    let vd = Vd::new().await?;
     let name: String = name.replace(" ", "");
-    vd.lock(&name)?;
+    vd.lock(&name).await?;
     Ok(())
 }
 
 // 解锁
 #[tauri::command]
-fn unlocked_vm(name: String) -> Result<()> {
-    let vd = vd::Vd::new()?;
+async fn unlocked_vm(name: String) -> Result<()> {
+    let vd = Vd::new().await?;
     let name: String = name.replace(" ", "");
-    vd.unlock(&name)?;
+    vd.unlock(&name).await?;
     Ok(())
 }
 
 // 启动画面
 #[tauri::command]
 async fn boot_screen(name: String) -> Result<()> {
-    let _output = if cfg!(target_os = "windows") {
-        std::process::Command::new("powershell")
-            .arg("-WindowStyle").arg("Hidden")
-            .arg("-Command").arg(format!("Start-Process vd -ArgumentList 'spice,{}'", &name))
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()?
-    } else if cfg!(target_os = "macos") {
-        std::process::Command::new("bash")
-            .arg("-c")
-            .arg(format!("nohup vd spice {} > /dev/null &", &name))
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()?
-    } else {
-        std::process::Command::new("sh")
-            .arg("-c")
-            .arg(format!("nohup vd spice {} > /dev/null &", &name))
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .output()?
-    };
+    let vd = Vd::new().await?;
+    let name = name.replace(" ", "");
+    vd.do_login(&name).await?;
     Ok(())
 }
 

@@ -29,6 +29,7 @@ anyhow = "1.0.66"
 defer = "*"
 registry = "1.2.3"
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
+tokio = { version = "1.41.0", features = ["full"] }
 
 [features]
 # by default Tauri runs in production mode
