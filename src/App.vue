@@ -5,11 +5,19 @@
 </script>
 
 <template>
-  <n-message-provider>
-    <router-view></router-view>
-  </n-message-provider>
+  <n-config-provider :theme="lightTheme">
+    <n-message-provider>
+      <router-view></router-view>
+    </n-message-provider>
+  </n-config-provider>
 </template>
   
+
+<script lang="ts">
+  import { lightTheme } from 'naive-ui';
+
+</script>
+
 <style scoped>
 .logo.vite:hover {
   filter: drop-shadow(0 0 2em #747bff);

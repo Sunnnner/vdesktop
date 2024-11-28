@@ -10,19 +10,31 @@
         <n-form-item label="SECRET" required>
           <n-input v-model:value="model.appsecret" placeholder="输入app secret" />
         </n-form-item>
-  
-        <n-form-item label="域名" required>
-          <n-input v-model:value="model.url" placeholder="输入url" />
+        
+        <n-form-item label="姓名" required>
+          <n-input v-model:value="model.name" placeholder="中文拼音" />
         </n-form-item>
-  
-        <n-form-item label="默认VM" required>
-          <n-input v-model:value="model.name" placeholder="输入默认启动的虚拟主机" />
-        </n-form-item>
-  
+        <n-space>
+          <n-form-item label="指定区域" required> </n-form-item>
+            <n-radio
+              :checked="checkedValue === 'beijing'"
+              value="beijing"
+              @change="handleChange"
+            >
+            北京
+            </n-radio>
+            <n-radio
+              :checked="checkedValue === 'tianjing'"
+              value="tianjing"
+              @change="handleChange"
+            >
+              天津
+            </n-radio>
+        </n-space>
+
         <n-row>
           <n-col span="24">
             <div style="display: flex; justify-content: flex-end;">
-              <n-button @click="openFile" round type="primary">导入配置文件</n-button>
               <n-button
                 @click="saveConfig"
                 round
@@ -38,16 +50,17 @@
   <script setup lang="ts">
   import { ref, onMounted } from 'vue';
   import { FormInst, FormRules } from 'naive-ui';
-  import { invoke } from '@tauri-apps/api/tauri';
-  import { open } from '@tauri-apps/api/dialog';
+  import { invoke } from "@tauri-apps/api/core"
   import { useRouter } from 'vue-router';
   import { useMessage } from 'naive-ui';
   
+
   interface Model {
     appid: string | null;
     appsecret: string | null;
     url: string | null;
     name: string | null;
+    server: string | null;
   }
   
   const rules: FormRules = {
@@ -56,47 +69,47 @@
     url: [{ required: true, message: '请输入域名', trigger: 'blur' }],
     name: [{ required: true, message: '请输入默认启动的虚拟主机', trigger: 'blur' }],
   };
+  const checkedValue = ref<string | null>(null)
   
   const model = ref<Model>({
     appid: null,
     appsecret: null,
-    url: 'https://vdesk.knd.io',
+    url: null,
     name: null,
+    server: null,
   });
   
   const formRef = ref<FormInst | null>(null);
   const router = useRouter();
   const message = useMessage();
   
-  const openFile = async () => {
-    const selected = await open({
-      filters: [{ name: 'vdesk', extensions: ['yaml', 'yml'] }],
-    });
-    if (selected) {
-      try {
-        const data: Partial<Model> = await invoke('read_yaml_file', { path: selected });
-        Object.assign(model.value, data);
-      } catch (e: any) {
-        message.error(e.message);
-      }
-    } else {
-      message.warning('未选择文件');
+  const updateConfig = (server: string| null) => {
+    if (server === 'beijing') {
+      model.value.url = 'https://vdesk.knd.io';
+      model.value.server = 'beijing';
+    } else if (server === 'tianjing') {
+      model.value.url = 'https://vdesk-tj.knd.io';
+      model.value.server = 'tianjing';
     }
   };
-  
+
   const saveConfig = async () => {
     if (formRef.value?.validate()) {
+      updateConfig(checkedValue.value);
       try {
-        await invoke('save_yaml_file', { config: model.value });
+        await invoke('save_config', { config: model.value });
         message.success('保存成功');
         router.push({ name: 'home' });
       } catch (e: any) {
-        console.log(e.m)
-        message.error(e.message);
+        message.error(e);
       }
     }
   };
-  
+
+  const handleChange = (e: Event) => {
+    checkedValue.value = (e.target as HTMLInputElement).value;
+    updateConfig(checkedValue.value);
+  };
   onMounted(async () => {
     const isFileExist = await invoke('is_exist_config');
     if (isFileExist) {
