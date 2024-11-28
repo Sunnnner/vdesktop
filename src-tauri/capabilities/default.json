@@ -5,9 +5,31 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "shell:default",
     "shell:allow-open",
-    {
-      "identifier": "http:allow-fetch"
-    }
+    "shell:allow-spawn",
+    "shell:allow-stdin-write",
+    "shell:allow-execute",
+    "fs:write-all",
+    "fs:read-all",
+    "os:default",
+    "core:path:default",
+    "core:path:allow-basename",
+    "core:path:allow-dirname",
+    "core:path:allow-is-absolute",
+    "core:path:allow-extname",
+    "core:path:allow-join",
+    "core:path:allow-normalize",
+    "core:path:allow-resolve",
+    "core:path:allow-resolve-directory",
+    "core:event:default",
+    "core:window:default",
+    "core:app:default",
+    "core:resources:default",
+    "core:resources:allow-close",
+    "core:menu:default",
+    "core:tray:default",
+    "http:default",
+    "core:window:allow-set-title"
   ]
 }

@@ -4,7 +4,7 @@ use tokio::io::AsyncWriteExt;
 use super::{config::Config, model::{Machine, SpiceConfig}};
 use crate::{utils::error::Error, Result};
 use std::{path::PathBuf, sync::Arc};
-
+use std::path::Path;
 #[cfg(windows)]
 use registry::{Data, Hive, Security};
 
@@ -79,7 +79,13 @@ impl Vd {
 
     #[cfg(not(target_os = "windows"))]
     pub async fn remote_viewer_path() -> Result<PathBuf> {
-        Ok(PathBuf::from("remote-viewer"))
+        match which::which("remote-viewer") {
+            Ok(path) => Ok(path),
+            Err(_) => {
+                let path = PathBuf::from("/usr/local/bin/remote-viewer");
+                Ok(path)
+            }
+        }
     }
 
     #[cfg(windows)]
@@ -106,7 +112,7 @@ impl Vd {
     }
 
 
-    pub async fn spice_viewer(&self, name: &str) -> Result<()> {
+    pub async fn spice_viewer(&self, name: &str, temp: &Path) -> Result<()> {
         let vd = Arc::new(self.clone());
         let name_clone = name.to_string();
 
@@ -117,15 +123,17 @@ impl Vd {
                 let _ = vd.unlock(&name_clone).await;
             });
         });
+
         let mut config = self.spice(name).await?;
+
         config.insert("title", name)?;
         config.insert("auto-resize", "mever")?;
         config.insert("debug", false)?;
         config.insert("cursor", "MODE")?;
         config.insert("full-screen", true)?;
 
-        let temp = std::env::temp_dir();
         let remote_viewer_config = temp.join(format!("__vd-remote-viewer-config-{}__", name));
+
         // 文件操作改为异步
         {
             let mut file = tokio::fs::File::create(&remote_viewer_config).await?;
@@ -137,8 +145,10 @@ impl Vd {
             };
             file.flush().await?;
         }
+
         // 运行外部命令
         let remote_viewer = Self::remote_viewer_path().await?;
+
         tokio::process::Command::new(remote_viewer)
             .arg(remote_viewer_config)
             .spawn()?

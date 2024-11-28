@@ -17,6 +17,7 @@ pub struct AppState {
     pub config_dir: Arc<PathBuf>,
     pub is_exist_config: bool,
     pub config_manager: ConfigManager,
+    pub temp_dir: Arc<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

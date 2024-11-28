@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "内网控制台",
-  "version": "1.5.5",
+  "productName": "vdesktop",
+  "version": "1.5.6",
   "identifier": "cn.com.rustcc",
   "build": {
     "beforeDevCommand": "pnpm dev",

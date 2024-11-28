@@ -44,11 +44,12 @@ pub async fn get_vms(app_handle: tauri::AppHandle) -> Result<Vec<Machine>> {
 #[tauri::command]
 pub async fn spice_viewer(app_handle: tauri::AppHandle, name: String) -> Result<SuccessMessage> {
     let path = app_handle.state::<AppState>().config_dir.clone();
+    let temp = app_handle.state::<AppState>().temp_dir.clone();
     let config = Config::get(&path).await?;
     let vd = Vd::new(config)?;
     vd.start(&name).await?;
     vd.lock(&name).await?;
-    vd.spice_viewer(&name).await?;
+    vd.spice_viewer(&name, &temp).await?;
     Ok(SuccessMessage{
       message: "启动成功".to_string()
     })

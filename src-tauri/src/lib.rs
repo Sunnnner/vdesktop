@@ -15,26 +15,30 @@ pub fn run() {
         .setup(|app| {
             tauri::async_runtime::block_on(async move {
                 let home_dir = app.path().home_dir().unwrap();
-            let path = home_dir.join(".config/config.yml");
-            if !path.exists() {
-                if let Some(parent) = path.parent() {
-                    std::fs::create_dir_all(parent)?;
+                let temp_dir = app.path().temp_dir().unwrap();
+                let path = home_dir.join(".config/config.yml");
+                if !path.exists() {
+                    if let Some(parent) = path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
                 }
-            }
-            let config_dir = Arc::new(path.clone());
-            let is_exist_config = config_dir.exists();
-            
-            let app_state = AppState {
-                config_dir,
-                is_exist_config,
-                config_manager: ConfigManager::new(path.clone()),
-            };
-            app.manage(app_state);
-            Ok(())
+                let config_dir = Arc::new(path.clone());
+                let is_exist_config = config_dir.exists();
+                
+                let app_state = AppState {
+                    config_dir,
+                    is_exist_config,
+                    config_manager: ConfigManager::new(path.clone()),
+                    temp_dir: Arc::new(temp_dir),
+                };
+                app.manage(app_state);
+                Ok(())
             })
         })
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_os::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_config, 
