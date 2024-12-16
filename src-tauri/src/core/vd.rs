@@ -4,6 +4,7 @@ use tokio::io::AsyncWriteExt;
 use super::{config::Config, model::{Machine, SpiceConfig}};
 use crate::{utils::error::Error, Result};
 use std::{path::PathBuf, sync::Arc};
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 #[cfg(windows)]
 use registry::{Data, Hive, Security};
@@ -79,13 +80,25 @@ impl Vd {
 
     #[cfg(not(target_os = "windows"))]
     pub async fn remote_viewer_path() -> Result<PathBuf> {
-        match which::which("remote-viewer") {
-            Ok(path) => Ok(path),
-            Err(_) => {
-                let path = PathBuf::from("/usr/local/bin/remote-viewer");
-                Ok(path)
+        // 优先使用which查找remote-viewer
+        if let Ok(path) = which::which("remote-viewer") {
+            return Ok(path);
+        }
+        
+        // 检查常见安装路径
+        let possible_paths = vec![
+            "/usr/local/bin/remote-viewer",
+            "/opt/local/bin/remote-viewer",
+            "/usr/bin/remote-viewer"
+        ];
+
+        for path in possible_paths {
+            if Path::new(path).exists() {
+                return Ok(PathBuf::from(path));
             }
         }
+
+        Err(Error::RemoteViewerNotFound)
     }
 
     #[cfg(windows)]
@@ -115,26 +128,28 @@ impl Vd {
     pub async fn spice_viewer(&self, name: &str, temp: &Path) -> Result<()> {
         let vd = Arc::new(self.clone());
         let name_clone = name.to_string();
-
-        // 创建清理函数
+    
         let _cleanup = defer::defer(move || {
             let vd = vd.clone();
             tokio::spawn(async move {
                 let _ = vd.unlock(&name_clone).await;
             });
         });
-
+    
         let mut config = self.spice(name).await?;
-
-        config.insert("title", name)?;
-        config.insert("auto-resize", "mever")?;
-        config.insert("debug", false)?;
-        config.insert("cursor", "MODE")?;
-        config.insert("full-screen", true)?;
-
-        let remote_viewer_config = temp.join(format!("__vd-remote-viewer-config-{}__", name));
-
-        // 文件操作改为异步
+        
+        // 配置设置
+        config.insert("auto-resize", "never")?;
+        config.insert("debug", "1")?;
+        config.insert("cursor", "local")?;
+        config.insert("full-screen", "1")?;
+        config.insert("enable-smartcard", "0")?;
+        config.insert("enable-usbredir", "0")?;
+        config.insert("resize-guest", "0")?;
+    
+        let remote_viewer_config = temp.join(format!("__vd-remote-viewer-config-{}__.vv", name));
+    
+        // 写入配置
         {
             let mut file = tokio::fs::File::create(&remote_viewer_config).await?;
             file.write_all(b"[virt-viewer]\n").await?;
@@ -145,18 +160,22 @@ impl Vd {
             };
             file.flush().await?;
         }
-
-        // 运行外部命令
+    
+        // 设置配置文件权限
+        tokio::fs::set_permissions(&remote_viewer_config, std::fs::Permissions::from_mode(0o644)).await?;
+    
         let remote_viewer = Self::remote_viewer_path().await?;
-
-        tokio::process::Command::new(remote_viewer)
-            .arg(remote_viewer_config)
-            .spawn()?
-            .wait()
-            .await?;
-
+    
+        // 直接执行remote-viewer
+        let mut command = tokio::process::Command::new(&remote_viewer);
+        command
+            .arg(&remote_viewer_config)
+            .env("DISPLAY", ":0")
+            .env("PATH", "/usr/local/bin:/opt/local/bin:/usr/bin:/bin")
+            .spawn()?;
         Ok(())
     }
+    
 
     pub async fn force_stop(&self, name: &str) -> Result<()> {
         self.stop(name).await?;
