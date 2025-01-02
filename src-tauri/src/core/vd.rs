@@ -139,16 +139,9 @@ impl Vd {
         let mut config = self.spice(name).await?;
         
         // 配置设置
-        config.insert("auto-resize", "never")?;
-        config.insert("debug", "1")?;
-        config.insert("cursor", "local")?;
-        config.insert("full-screen", "1")?;
-        config.insert("enable-smartcard", "0")?;
-        config.insert("enable-usbredir", "0")?;
-        config.insert("resize-guest", "0")?;
-    
+        config.insert("hotkeys", "")?;
+
         let remote_viewer_config = temp.join(format!("__vd-remote-viewer-config-{}__.vv", name));
-    
         // 写入配置
         {
             let mut file = tokio::fs::File::create(&remote_viewer_config).await?;
@@ -170,7 +163,21 @@ impl Vd {
         let mut command = tokio::process::Command::new(&remote_viewer);
         command
             .arg(&remote_viewer_config)
-            .env("DISPLAY", ":0")
+            .arg("--class=vd-remote-viewer")           // 设置唯一的程序类名
+            .arg(&format!("--name=vd-viewer-{}", name)) // 使用动态名称区分不同实例
+            .arg("--gtk-module=gail:atk-bridge")  
+            .env("GTK_CSD", "0") 
+            .env("GTK_THEME", "Adwaita:light")
+            .env("GTK2_RC_FILES", "")
+            .env("GTK_OVERLAY_SCROLLING", "1")
+            .env("GTK_MODULES", "")
+            .arg("--auto-resize=never")              // 命令行强制禁用自动缩放
+            .arg("--spice-disable-audio")
+            .arg("--cursor=local")                   // 本地光标
+            .arg("--spice-disable-effects=all")
+            .arg("--spice-disable-usbredir")
+            .arg("--spice-preferred-compression=lz4")  // 关闭压缩，直接传输
+            .arg("--spice-disable-effects=all")        // 禁用所有视觉效果
             .env("PATH", "/usr/local/bin:/opt/local/bin:/usr/bin:/bin")
             .spawn()?;
         Ok(())
